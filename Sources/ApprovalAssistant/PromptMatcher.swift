@@ -4,6 +4,7 @@ import Foundation
 enum ApprovalPromptKind: String, Codable, Equatable {
     case command
     case fileEdits = "file_edits"
+    case permissions
 
     var title: String {
         switch self {
@@ -11,6 +12,8 @@ enum ApprovalPromptKind: String, Codable, Equatable {
             return "Command"
         case .fileEdits:
             return "File edits"
+        case .permissions:
+            return "Permissions"
         }
     }
 }
@@ -28,14 +31,16 @@ struct CodexApprovalPrompt: Equatable {
 }
 
 enum PromptMatcher {
-    private static let promptTitles = [
-        "Would you like to proceed?",
-        "Would you like to make the following edits?",
+    private static let promptTitles: [(text: String, kind: ApprovalPromptKind)] = [
+        ("Would you like to proceed?", .command),
+        ("Would you like to run the following command?", .command),
+        ("Would you like to make the following edits?", .fileEdits),
+        ("Would you like to grant these permissions?", .permissions),
     ]
-    private static let approveOnceOption = "1. Yes, proceed"
-    private static let approveAndRememberOption = "2. Yes, and don't ask again"
-    private static let threeChoiceRejectOption = "3. No,"
-    private static let twoChoiceRejectOption = "2. No,"
+    private static let approveOncePattern = #"(?m)^[ \t›>]*1\.\s+Yes(?:,|\b)"#
+    private static let approveAndRememberPattern = #"(?m)^[ \t›>]*2\.\s+Yes(?:,|\b)"#
+    private static let threeChoiceRejectPattern = #"(?m)^[ \t›>]*3\.\s+No(?:,|\b)"#
+    private static let twoChoiceRejectPattern = #"(?m)^[ \t›>]*2\.\s+No(?:,|\b)"#
     private static let maximumPromptCharacters = 8_000
     private static let maximumTrailingNonEmptyLines = 3
     private static let maximumLogFieldCharacters = 500
@@ -45,21 +50,26 @@ enum PromptMatcher {
         let normalized = normalize(contents)
         let searchableSuffix = String(normalized.suffix(maximumPromptCharacters))
 
-        guard let titleRange = promptTitles
-            .compactMap({ searchableSuffix.range(of: $0, options: .backwards) })
-            .max(by: { $0.lowerBound < $1.lowerBound })
+        guard let matchedTitle = promptTitles
+            .compactMap({ title -> (range: Range<String.Index>, kind: ApprovalPromptKind)? in
+                guard let range = searchableSuffix.range(of: title.text, options: .backwards) else {
+                    return nil
+                }
+                return (range, title.kind)
+            })
+            .max(by: { $0.range.lowerBound < $1.range.lowerBound })
         else {
             return nil
         }
 
-        let promptBlock = String(searchableSuffix[titleRange.lowerBound...])
-        guard let onceRange = promptBlock.range(of: approveOnceOption) else {
+        let promptBlock = String(searchableSuffix[matchedTitle.range.lowerBound...])
+        guard let onceRange = promptBlock.range(of: approveOncePattern, options: .regularExpression) else {
             return nil
         }
 
-        let rememberRange = promptBlock.range(of: approveAndRememberOption)
-        let threeChoiceRejectRange = promptBlock.range(of: threeChoiceRejectOption)
-        let twoChoiceRejectRange = promptBlock.range(of: twoChoiceRejectOption)
+        let rememberRange = promptBlock.range(of: approveAndRememberPattern, options: .regularExpression)
+        let threeChoiceRejectRange = promptBlock.range(of: threeChoiceRejectPattern, options: .regularExpression)
+        let twoChoiceRejectRange = promptBlock.range(of: twoChoiceRejectPattern, options: .regularExpression)
 
         let supportsRemember: Bool
         let rejectRange: Range<String.Index>
@@ -92,14 +102,14 @@ enum PromptMatcher {
 
         let digest = SHA256.hash(data: Data(promptBlock.utf8))
         let signature = digest.map { String(format: "%02x", $0) }.joined()
-        let kind: ApprovalPromptKind = promptBlock.hasPrefix(promptTitles[1]) ? .fileEdits : .command
         let description = firstField(named: "Description", in: promptBlock)
+            ?? firstField(named: "Reason", in: promptBlock)
         let destinations = fields(named: "Destination", in: promptBlock)
 
         return CodexApprovalPrompt(
             signature: signature,
             supportsRemember: supportsRemember,
-            kind: kind,
+            kind: matchedTitle.kind,
             description: description,
             destinations: destinations
         )

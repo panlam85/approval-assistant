@@ -117,12 +117,14 @@ final class TerminalAutomation {
             if (processes of targetTab) does not contain "codex" then return "codex_missing"
 
             set currentContents to get contents of tab \#(snapshot.tabIndex) of targetWindow
-            set hasCommandPrompt to currentContents contains "Would you like to proceed?"
+            set hasLegacyCommandPrompt to currentContents contains "Would you like to proceed?"
+            set hasCommandPrompt to currentContents contains "Would you like to run the following command?"
             set hasFileEditPrompt to currentContents contains "Would you like to make the following edits?"
-            if not hasCommandPrompt and not hasFileEditPrompt then return "prompt_gone"
-            if currentContents does not contain "1. Yes, proceed" then return "prompt_gone"
-            set hasThreeChoiceLayout to (currentContents contains "2. Yes, and don't ask again") and (currentContents contains "3. No,")
-            set hasTwoChoiceLayout to currentContents contains "2. No,"
+            set hasPermissionsPrompt to currentContents contains "Would you like to grant these permissions?"
+            if not hasLegacyCommandPrompt and not hasCommandPrompt and not hasFileEditPrompt and not hasPermissionsPrompt then return "prompt_gone"
+            if currentContents does not contain "1. Yes" then return "prompt_gone"
+            set hasThreeChoiceLayout to (currentContents contains "2. Yes") and (currentContents contains "3. No")
+            set hasTwoChoiceLayout to currentContents contains "2. No"
             if not hasThreeChoiceLayout and not hasTwoChoiceLayout then return "prompt_gone"
 
             set miniaturized of targetWindow to false

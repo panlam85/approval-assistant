@@ -9,7 +9,7 @@ It brings the requesting Terminal tab to the front and sends the selected **yes*
 - Runs only in the macOS menu bar, with no Dock icon or permanent window.
 - Can be enabled, paused, or quit from a native menu.
 - Scans every Apple Terminal window and tab whose process list contains `codex`.
-- Recognizes Codex command and file-edit approval prompts.
+- Recognizes Codex command, file-edit, and permission approval prompts.
 - Selects the requesting tab before responding.
 - Supports approve-once and approve-and-remember modes.
 - Keeps a bounded, local history of successful approvals.
@@ -69,10 +69,10 @@ The app is intentionally menu-bar-only. Quitting removes its icon and stops all 
 
 ## Approval log
 
-Version 0.1.1 records successful automatic approvals in **Approval Log…**. Each entry includes:
+Approval Assistant records successful automatic approvals in **Approval Log…**. Each entry includes:
 
 - approval time and Terminal TTY;
-- whether the prompt requested a command or file edits;
+- whether the prompt requested a command, file edits, or permissions;
 - Codex's structured description and destination paths;
 - the response number; and
 - whether the remember option was used.

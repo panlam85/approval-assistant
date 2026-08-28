@@ -37,6 +37,29 @@ final class PromptMatcherTests: XCTestCase {
     Press enter to confirm or esc to cancel
     """
 
+    private let currentCommandPrompt = """
+    Would you like to run the following command?
+
+    Reason: Verify the Approval Assistant fix
+    $ git status --short
+
+    1. Yes, proceed (y)
+    2. Yes, and don't ask again for commands that start with `git status` (a)
+    3. No, and tell Codex what to do differently (esc)
+
+    Press enter to confirm or esc to cancel
+    """
+
+    private let currentPermissionsPrompt = """
+    Would you like to grant these permissions?
+
+    1. Yes, just this once
+    2. Yes, and allow these permissions for this session
+    3. No, continue without running it
+
+    Press enter to confirm or esc to cancel
+    """
+
     func testMatchesCurrentThreeChoiceCodexPrompt() {
         XCTAssertNotNil(PromptMatcher.match(contents: validPrompt))
     }
@@ -66,6 +89,24 @@ final class PromptMatcherTests: XCTestCase {
         XCTAssertFalse(prompt.supportsRemember)
         XCTAssertEqual(prompt.responseNumber(for: .approveOnce), 1)
         XCTAssertEqual(prompt.responseNumber(for: .approveAndRemember), 1)
+    }
+
+    func testMatchesCurrentRunCommandPrompt() throws {
+        let prompt = try XCTUnwrap(PromptMatcher.match(contents: currentCommandPrompt))
+
+        XCTAssertEqual(prompt.kind, .command)
+        XCTAssertEqual(prompt.description, "Verify the Approval Assistant fix")
+        XCTAssertTrue(prompt.supportsRemember)
+        XCTAssertEqual(prompt.responseNumber(for: .approveAndRemember), 2)
+    }
+
+    func testMatchesCurrentPermissionsPrompt() throws {
+        let prompt = try XCTUnwrap(PromptMatcher.match(contents: currentPermissionsPrompt))
+
+        XCTAssertEqual(prompt.kind, .permissions)
+        XCTAssertTrue(prompt.supportsRemember)
+        XCTAssertEqual(prompt.responseNumber(for: .approveOnce), 1)
+        XCTAssertEqual(prompt.responseNumber(for: .approveAndRemember), 2)
     }
 
     func testThreeChoicePromptUsesRememberResponse() throws {
