@@ -45,6 +45,21 @@ final class PromptMatcherTests: XCTestCase {
         XCTAssertNotNil(PromptMatcher.match(contents: validFileEditPrompt))
     }
 
+    func testExtractsOnlyStructuredLogMetadata() throws {
+        let promptText = validFileEditPrompt.replacingOccurrences(
+            of: "Destination: /private/tmp/example.ts",
+            with: "Destination: /private/tmp/example.ts\nDestination: /private/tmp/second.ts"
+        )
+        let prompt = try XCTUnwrap(PromptMatcher.match(contents: promptText))
+
+        XCTAssertEqual(prompt.kind, .fileEdits)
+        XCTAssertEqual(prompt.description, "Apply proposed file edits")
+        XCTAssertEqual(
+            prompt.destinations,
+            ["/private/tmp/example.ts", "/private/tmp/second.ts"]
+        )
+    }
+
     func testMatchesTwoChoicePrompt() throws {
         let prompt = try XCTUnwrap(PromptMatcher.match(contents: validTwoChoicePrompt))
 
@@ -57,6 +72,9 @@ final class PromptMatcherTests: XCTestCase {
         let prompt = try XCTUnwrap(PromptMatcher.match(contents: validPrompt))
 
         XCTAssertTrue(prompt.supportsRemember)
+        XCTAssertEqual(prompt.kind, .command)
+        XCTAssertEqual(prompt.description, "Apply the requested change")
+        XCTAssertEqual(prompt.destinations, ["/private/tmp/example"])
         XCTAssertEqual(prompt.responseNumber(for: .approveOnce), 1)
         XCTAssertEqual(prompt.responseNumber(for: .approveAndRemember), 2)
     }

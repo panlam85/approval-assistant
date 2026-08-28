@@ -32,6 +32,10 @@ struct MenuBarMenu: View {
         }
         .disabled(monitor.isScanning)
 
+        Button("Approval Log…") {
+            monitor.openApprovalLog()
+        }
+
         Toggle(
             "Open at Login",
             isOn: Binding(
@@ -45,6 +49,8 @@ struct MenuBarMenu: View {
         }
 
         Divider()
+
+        Text("Approval Assistant \(AppVersion.current)")
 
         Button("Quit Approval Assistant") {
             NSApplication.shared.terminate(nil)

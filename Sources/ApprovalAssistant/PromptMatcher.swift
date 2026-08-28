@@ -1,9 +1,26 @@
 import CryptoKit
 import Foundation
 
+enum ApprovalPromptKind: String, Codable, Equatable {
+    case command
+    case fileEdits = "file_edits"
+
+    var title: String {
+        switch self {
+        case .command:
+            return "Command"
+        case .fileEdits:
+            return "File edits"
+        }
+    }
+}
+
 struct CodexApprovalPrompt: Equatable {
     let signature: String
     let supportsRemember: Bool
+    let kind: ApprovalPromptKind
+    let description: String?
+    let destinations: [String]
 
     func responseNumber(for choice: ApprovalChoice) -> Int {
         choice == .approveAndRemember && supportsRemember ? 2 : 1
@@ -21,6 +38,8 @@ enum PromptMatcher {
     private static let twoChoiceRejectOption = "2. No,"
     private static let maximumPromptCharacters = 8_000
     private static let maximumTrailingNonEmptyLines = 3
+    private static let maximumLogFieldCharacters = 500
+    private static let maximumLoggedDestinations = 10
 
     static func match(contents: String) -> CodexApprovalPrompt? {
         let normalized = normalize(contents)
@@ -73,13 +92,49 @@ enum PromptMatcher {
 
         let digest = SHA256.hash(data: Data(promptBlock.utf8))
         let signature = digest.map { String(format: "%02x", $0) }.joined()
-        return CodexApprovalPrompt(signature: signature, supportsRemember: supportsRemember)
+        let kind: ApprovalPromptKind = promptBlock.hasPrefix(promptTitles[1]) ? .fileEdits : .command
+        let description = firstField(named: "Description", in: promptBlock)
+        let destinations = fields(named: "Destination", in: promptBlock)
+
+        return CodexApprovalPrompt(
+            signature: signature,
+            supportsRemember: supportsRemember,
+            kind: kind,
+            description: description,
+            destinations: destinations
+        )
     }
 
     private static func normalize(_ value: String) -> String {
         value
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
+    }
+
+    private static func firstField(named name: String, in promptBlock: String) -> String? {
+        fields(named: name, in: promptBlock, limit: 1).first
+    }
+
+    private static func fields(
+        named name: String,
+        in promptBlock: String,
+        limit: Int = maximumLoggedDestinations
+    ) -> [String] {
+        let prefix = "\(name):"
+        let values = promptBlock
+            .split(whereSeparator: \.isNewline)
+            .compactMap { rawLine -> String? in
+                let line = rawLine.trimmingCharacters(in: .whitespaces)
+                guard line.hasPrefix(prefix) else {
+                    return nil
+                }
+                let value = line.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces)
+                guard !value.isEmpty else {
+                    return nil
+                }
+                return String(value.prefix(maximumLogFieldCharacters))
+            }
+        return Array(values.prefix(limit))
     }
 }
 

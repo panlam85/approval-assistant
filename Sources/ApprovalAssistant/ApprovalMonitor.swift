@@ -34,6 +34,9 @@ final class ApprovalMonitor: ObservableObject {
     @Published private(set) var lastApprovalTTY: String?
     @Published private(set) var launchAtLoginEnabled = false
 
+    let approvalLog: ApprovalLogStore
+    private let approvalLogWindowController = ApprovalLogWindowController()
+
     private let defaults: UserDefaults
     private let terminalAutomation: TerminalAutomation
     private var promptLatch = PromptLatch()
@@ -45,10 +48,12 @@ final class ApprovalMonitor: ObservableObject {
 
     init(
         defaults: UserDefaults = .standard,
-        terminalAutomation: TerminalAutomation = TerminalAutomation()
+        terminalAutomation: TerminalAutomation = TerminalAutomation(),
+        approvalLog: ApprovalLogStore = ApprovalLogStore()
     ) {
         self.defaults = defaults
         self.terminalAutomation = terminalAutomation
+        self.approvalLog = approvalLog
 
         let legacyDefaults = UserDefaults(suiteName: Self.legacyDefaultsDomain)
         let hasCurrentEnabledValue = defaults.object(forKey: DefaultsKey.isEnabled) != nil
@@ -104,6 +109,11 @@ final class ApprovalMonitor: ObservableObject {
         terminalAutomation.openAutomationSettings()
     }
 
+    func openApprovalLog() {
+        approvalLogWindowController.show(logStore: approvalLog)
+        lastEvent = "Opened Approval Log."
+    }
+
     private func startMonitoring() {
         monitorTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
@@ -149,10 +159,20 @@ final class ApprovalMonitor: ObservableObject {
                 if result == .sent {
                     promptLatch.markHandled(tty: snapshot.tty, prompt: prompt)
                     lastApprovalTTY = snapshot.tty
+                    let logSaved = approvalLog.record(
+                        ApprovalLogEntry(
+                            tty: snapshot.tty,
+                            responseNumber: responseNumber,
+                            prompt: prompt
+                        )
+                    )
                     if approvalChoice == .approveAndRemember, !prompt.supportsRemember {
                         lastEvent = "Sent 1 to Codex in \(snapshot.tty); remember was unavailable."
                     } else {
                         lastEvent = "Sent \(responseNumber) to Codex in \(snapshot.tty)."
+                    }
+                    if !logSaved {
+                        lastEvent += " The approval log could not be saved."
                     }
                 } else if result != .promptGone {
                     lastEvent = "Skipped \(snapshot.tty): \(result.rawValue.replacingOccurrences(of: "_", with: " "))."
