@@ -35,7 +35,8 @@ Do not replace exact matching with a broad check for words such as `yes`, `appro
 - Never close, replace, or reuse a user's Terminal window in production code.
 - Action tests may close only the controlled fixture window they created.
 - Treat windows and tabs disappearing during a scan as a normal race and retry safely.
-- Never log, persist, upload, or include Terminal contents in analytics.
+- Never log, persist, upload, or include full Terminal contents in analytics.
+- Approval history may contain only the bounded structured fields represented by `ApprovalLogEntry`.
 
 ## Code style
 

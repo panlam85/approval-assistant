@@ -75,6 +75,11 @@ final class TerminalAutomationLiveTests: XCTestCase {
         defer { try? closeFixtureWindow(tty: fixtureTTY) }
 
         XCTAssertTrue(try waitForResponse(at: responseFile).hasPrefix("1"))
+
+        let loggedEntry = try XCTUnwrap(waitForLogEntry(tty: fixtureTTY))
+        XCTAssertEqual(loggedEntry.responseNumber, 1)
+        XCTAssertEqual(loggedEntry.promptKind, .command)
+        XCTAssertEqual(loggedEntry.description, "Controlled two-choice Approval Assistant test")
     }
 
     private func runControlledAction(
@@ -152,6 +157,17 @@ final class TerminalAutomationLiveTests: XCTestCase {
         }
         XCTFail("The controlled Terminal fixture did not receive a response.")
         return ""
+    }
+
+    private func waitForLogEntry(tty: String) -> ApprovalLogEntry? {
+        for _ in 0..<100 {
+            if let entry = ApprovalLogStore().entries.first(where: { $0.tty == tty }) {
+                return entry
+            }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        XCTFail("The installed app did not persist the controlled approval log entry.")
+        return nil
     }
 
     private func closeFixtureWindow(tty: String) throws {

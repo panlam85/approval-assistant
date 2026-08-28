@@ -12,6 +12,7 @@ It brings the requesting Terminal tab to the front and sends the selected **yes*
 - Recognizes Codex command and file-edit approval prompts.
 - Selects the requesting tab before responding.
 - Supports approve-once and approve-and-remember modes.
+- Keeps a bounded, local history of successful approvals.
 - Can start automatically when you log in.
 - Keeps terminal contents on your Mac and makes no network requests.
 
@@ -59,11 +60,32 @@ Click the shield icon in the menu bar to:
 - enable or pause automatic approval;
 - choose approve once or approve and remember;
 - perform a read-only scan;
+- open the Approval Log window;
 - enable Open at Login;
 - open macOS Automation settings; or
 - quit the app.
 
 The app is intentionally menu-bar-only. Quitting removes its icon and stops all monitoring. On first launch, Approval Assistant gives its item a preferred position in the visible status area so macOS does not place it underneath a MacBook notch. You can still hold Command and drag the icon to your preferred location.
+
+## Approval log
+
+Version 0.1.1 records successful automatic approvals in **Approval Log…**. Each entry includes:
+
+- approval time and Terminal TTY;
+- whether the prompt requested a command or file edits;
+- Codex's structured description and destination paths;
+- the response number; and
+- whether the remember option was used.
+
+The log retains the newest 500 entries. Use **Clear Log** in the log window to remove them after a confirmation prompt.
+
+The data stays on this Mac at:
+
+```text
+~/Library/Application Support/Approval Assistant/approval-log.json
+```
+
+The directory and JSON file are created with owner-only permissions. Approval Assistant does not save full Terminal scrollback, source diffs, or rejected/failed approval attempts.
 
 ## Safety model
 
@@ -78,7 +100,7 @@ Approval Assistant uses a deliberately narrow matcher:
 - each visible prompt is handled once per TTY;
 - stale windows or tabs that disappear during a scan are skipped and retried.
 
-Terminal contents are read only for local matching. They are not logged, stored, or sent over the network.
+Terminal contents are read only for local matching. Only the structured successful-approval fields listed above are stored; full scrollback is not logged or sent over the network.
 
 ## Tests
 
