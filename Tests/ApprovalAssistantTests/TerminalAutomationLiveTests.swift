@@ -52,6 +52,31 @@ final class TerminalAutomationLiveTests: XCTestCase {
         )
     }
 
+    func testInstalledAppAutomaticallyApprovesControlledPrompt() throws {
+        guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_INSTALLED_APP_TEST"] == "1" else {
+            throw XCTSkip("Set CODEX_APPROVAL_INSTALLED_APP_TEST=1 to test the running installed app.")
+        }
+
+        let fileManager = FileManager.default
+        let fixtureDirectory = fileManager.temporaryDirectory
+            .appendingPathComponent("approval-assistant-installed-\(UUID().uuidString)", isDirectory: true)
+        let fixtureSource = fixtureDirectory.appendingPathComponent("codex.c")
+        let fixtureExecutable = fixtureDirectory.appendingPathComponent("codex")
+        let responseFile = fixtureDirectory.appendingPathComponent("response.txt")
+
+        try fileManager.createDirectory(at: fixtureDirectory, withIntermediateDirectories: true)
+        try controlledCodexSource.write(to: fixtureSource, atomically: true, encoding: .utf8)
+        try compileFixture(source: fixtureSource, executable: fixtureExecutable)
+        defer { try? fileManager.removeItem(at: fixtureDirectory) }
+
+        let encodedPrompt = Data(twoChoicePrompt.utf8).base64EncodedString()
+        let command = "printf '%s' '\(encodedPrompt)' | /usr/bin/base64 -D; exec '\(fixtureExecutable.path)' '\(responseFile.path)'"
+        let fixtureTTY = try openFixtureTab(command: command)
+        defer { try? closeFixtureWindow(tty: fixtureTTY) }
+
+        XCTAssertTrue(try waitForResponse(at: responseFile).hasPrefix("1"))
+    }
+
     private func runControlledAction(
         prompt: String,
         choice: ApprovalChoice,
@@ -102,7 +127,7 @@ final class TerminalAutomationLiveTests: XCTestCase {
         automation: TerminalAutomation,
         tty: String
     ) throws -> TerminalTabSnapshot {
-        for _ in 0..<30 {
+        for _ in 0..<100 {
             if let snapshot = try automation.scanTabs().first(where: {
                 $0.tty == tty && $0.containsCodexProcess && PromptMatcher.match(contents: $0.contents) != nil
             }) {
@@ -119,7 +144,7 @@ final class TerminalAutomationLiveTests: XCTestCase {
     }
 
     private func waitForResponse(at url: URL) throws -> String {
-        for _ in 0..<30 {
+        for _ in 0..<100 {
             if let response = try? String(contentsOf: url, encoding: .utf8), !response.isEmpty {
                 return response
             }

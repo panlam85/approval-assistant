@@ -63,7 +63,7 @@ Click the shield icon in the menu bar to:
 - open macOS Automation settings; or
 - quit the app.
 
-The app is intentionally menu-bar-only. Quitting removes its icon and stops all monitoring. If the icon is hidden by a crowded menu bar or a MacBook notch, hold Command and drag the icon closer to the right side of the menu bar.
+The app is intentionally menu-bar-only. Quitting removes its icon and stops all monitoring. On first launch, Approval Assistant gives its item a preferred position in the visible status area so macOS does not place it underneath a MacBook notch. You can still hold Command and drag the icon to your preferred location.
 
 ## Safety model
 
@@ -100,6 +100,13 @@ The action tests create their own controlled Terminal fixture and close only tha
 ```sh
 CODEX_APPROVAL_ACTION_TEST=1 swift test --disable-index-store \
   --filter TerminalAutomationLiveTests
+```
+
+To verify the already-running installed app performs the approval itself, enable it and run:
+
+```sh
+CODEX_APPROVAL_INSTALLED_APP_TEST=1 swift test --disable-index-store \
+  --filter TerminalAutomationLiveTests/testInstalledAppAutomaticallyApprovesControlledPrompt
 ```
 
 ## Distribution status
