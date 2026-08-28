@@ -52,6 +52,30 @@ final class TerminalAutomationLiveTests: XCTestCase {
         )
     }
 
+    func testSelectsCurrentCommandPromptAndSendsApproveOnce() throws {
+        guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_ACTION_TEST"] == "1" else {
+            throw XCTSkip("Set CODEX_APPROVAL_ACTION_TEST=1 to run the controlled Terminal input test.")
+        }
+
+        try runControlledAction(
+            prompt: currentTwoChoiceCommandPrompt,
+            choice: .approveAndRemember,
+            expectedResponse: "1"
+        )
+    }
+
+    func testSelectsCurrentPermissionsPromptAndSendsRemember() throws {
+        guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_ACTION_TEST"] == "1" else {
+            throw XCTSkip("Set CODEX_APPROVAL_ACTION_TEST=1 to run the controlled Terminal input test.")
+        }
+
+        try runControlledAction(
+            prompt: currentPermissionsPrompt,
+            choice: .approveAndRemember,
+            expectedResponse: "2"
+        )
+    }
+
     func testInstalledAppAutomaticallyApprovesControlledPrompt() throws {
         guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_INSTALLED_APP_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_APPROVAL_INSTALLED_APP_TEST=1 to test the running installed app.")
@@ -69,7 +93,7 @@ final class TerminalAutomationLiveTests: XCTestCase {
         try compileFixture(source: fixtureSource, executable: fixtureExecutable)
         defer { try? fileManager.removeItem(at: fixtureDirectory) }
 
-        let encodedPrompt = Data(twoChoicePrompt.utf8).base64EncodedString()
+        let encodedPrompt = Data(currentTwoChoiceCommandPrompt.utf8).base64EncodedString()
         let command = "printf '%s' '\(encodedPrompt)' | /usr/bin/base64 -D; exec '\(fixtureExecutable.path)' '\(responseFile.path)'"
         let fixtureTTY = try openFixtureTab(command: command)
         defer { try? closeFixtureWindow(tty: fixtureTTY) }
@@ -79,7 +103,7 @@ final class TerminalAutomationLiveTests: XCTestCase {
         let loggedEntry = try XCTUnwrap(waitForLogEntry(tty: fixtureTTY))
         XCTAssertEqual(loggedEntry.responseNumber, 1)
         XCTAssertEqual(loggedEntry.promptKind, .command)
-        XCTAssertEqual(loggedEntry.description, "Controlled two-choice Approval Assistant test")
+        XCTAssertEqual(loggedEntry.description, "Controlled current command Approval Assistant test")
     }
 
     private func runControlledAction(
@@ -253,6 +277,31 @@ final class TerminalAutomationLiveTests: XCTestCase {
 
         1. Yes, proceed (y)
         2. No, and tell Codex what to do differently (esc)
+
+        Press enter to confirm or esc to cancel
+        """
+    }
+
+    private var currentTwoChoiceCommandPrompt: String {
+        """
+        Would you like to run the following command?
+
+        Reason: Controlled current command Approval Assistant test
+
+        1. Yes, just this once
+        2. No, and tell Codex what to do differently
+
+        Press enter to confirm or esc to cancel
+        """
+    }
+
+    private var currentPermissionsPrompt: String {
+        """
+        Would you like to grant these permissions?
+
+        1. Yes, just this once
+        2. Yes, and allow these permissions for this session
+        3. No, continue without running it
 
         Press enter to confirm or esc to cancel
         """

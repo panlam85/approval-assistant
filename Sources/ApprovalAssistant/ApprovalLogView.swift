@@ -100,6 +100,13 @@ private struct ApprovalLogRow: View {
     }
 
     private var iconName: String {
-        entry.promptKind == .command ? "terminal" : "doc.badge.ellipsis"
+        switch entry.promptKind {
+        case .command:
+            return "terminal"
+        case .fileEdits:
+            return "doc.badge.ellipsis"
+        case .permissions:
+            return "lock.shield"
+        }
     }
 }
