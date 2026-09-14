@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4 — 2026-09-14
+
+- Send approvals directly to the requesting tab in the background, without bringing Terminal forward or changing its selected tab or minimized state.
+- Remove explicit Terminal activation that could switch macOS Spaces.
+- Add a live regression test verifying another app keeps focus and a minimized Terminal fixture stays minimized while receiving approval.
+
 ## 0.1.3 — 2026-09-14
 
 - Continue scanning Terminal windows when a window ID is missing.

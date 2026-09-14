@@ -123,7 +123,6 @@ final class TerminalAutomation {
                 if targetWindowIndex is not 0 then exit repeat
             end repeat
             if targetWindowIndex is 0 then return "tab_missing"
-            set targetWindow to window targetWindowIndex
             set targetTab to tab targetTabIndex of window targetWindowIndex
 
             if tty of targetTab is not "\#(snapshot.tty)" then return "tab_changed"
@@ -140,12 +139,8 @@ final class TerminalAutomation {
             set hasTwoChoiceLayout to currentContents contains "2. No"
             if not hasThreeChoiceLayout and not hasTwoChoiceLayout then return "prompt_gone"
 
-            set miniaturized of targetWindow to false
-            set selected tab of targetWindow to targetTab
-            set index of targetWindow to 1
-            activate
-            -- Bringing the window forward changes positional references.
-            set targetTab to tab targetTabIndex of window 1
+            -- Address the existing tab directly without activating Terminal,
+            -- selecting a tab, restoring a window, or changing Spaces.
             if tty of targetTab is not "\#(snapshot.tty)" then return "tab_changed"
             if (processes of targetTab) does not contain "codex" then return "codex_missing"
             do script "\#(responseNumber)" in targetTab

@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import ApprovalAssistant
 
@@ -28,6 +29,16 @@ final class TerminalAutomationLiveTests: XCTestCase {
         )
     }
 
+    func testApprovesInBackgroundWithoutRestoringMinimizedWindow() throws {
+        guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_ACTION_TEST"] == "1" else {
+            throw XCTSkip("Set CODEX_APPROVAL_ACTION_TEST=1 to run the controlled Terminal input test.")
+        }
+        try runControlledAction(
+            prompt: threeChoicePrompt, choice: .approveOnce,
+            expectedResponse: "1", background: true
+        )
+    }
+
     func testScansCodexTerminalTabsWithoutSendingInput() throws {
         guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_LIVE_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_APPROVAL_LIVE_TEST=1 to run the read-only Terminal scan.")
@@ -53,7 +64,7 @@ final class TerminalAutomationLiveTests: XCTestCase {
         }
     }
 
-    func testSelectsFixtureTabAndSendsApproveOnce() throws {
+    func testAnswersFixtureTabAndSendsApproveOnce() throws {
         guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_ACTION_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_APPROVAL_ACTION_TEST=1 to run the controlled Terminal input test.")
         }
@@ -77,7 +88,7 @@ final class TerminalAutomationLiveTests: XCTestCase {
         )
     }
 
-    func testSelectsCurrentCommandPromptAndSendsApproveOnce() throws {
+    func testAnswersCurrentCommandPromptAndSendsApproveOnce() throws {
         guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_ACTION_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_APPROVAL_ACTION_TEST=1 to run the controlled Terminal input test.")
         }
@@ -89,7 +100,7 @@ final class TerminalAutomationLiveTests: XCTestCase {
         )
     }
 
-    func testSelectsCurrentPermissionsPromptAndSendsRemember() throws {
+    func testAnswersCurrentPermissionsPromptAndSendsRemember() throws {
         guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_ACTION_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_APPROVAL_ACTION_TEST=1 to run the controlled Terminal input test.")
         }
@@ -135,7 +146,8 @@ final class TerminalAutomationLiveTests: XCTestCase {
         prompt: String,
         choice: ApprovalChoice,
         expectedResponse: String,
-        discardWindowLocation: Bool = false
+        discardWindowLocation: Bool = false,
+        background: Bool = false
     ) throws {
         let fileManager = FileManager.default
         let fixtureDirectory = fileManager.temporaryDirectory
@@ -164,6 +176,22 @@ final class TerminalAutomationLiveTests: XCTestCase {
         }
         let matchedPrompt = try XCTUnwrap(PromptMatcher.match(contents: snapshot.contents))
 
+        let previousApp = NSWorkspace.shared.frontmostApplication
+        defer {
+            if background { previousApp?.activate() }
+        }
+        if background {
+            _ = try executeAppleScript("""
+                tell application "Terminal"
+                    set miniaturized of window id \(try XCTUnwrap(snapshot.windowID)) to true
+                end tell
+                tell application "Finder" to activate
+                """)
+            Thread.sleep(forTimeInterval: 0.3)
+            XCTAssertEqual(NSWorkspace.shared.frontmostApplication?.bundleIdentifier, "com.apple.finder")
+        }
+        let foregroundPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+
         let result = try automation.answer(
             snapshot: snapshot,
             expectedPrompt: matchedPrompt,
@@ -172,6 +200,16 @@ final class TerminalAutomationLiveTests: XCTestCase {
 
         XCTAssertEqual(result, .sent)
         XCTAssertTrue(try waitForResponse(at: responseFile).hasPrefix(expectedResponse))
+        if background {
+            XCTAssertEqual(NSWorkspace.shared.frontmostApplication?.processIdentifier, foregroundPID)
+            let minimized = try executeAppleScript("""
+                tell application "Terminal"
+                    return miniaturized of window id \(try XCTUnwrap(snapshot.windowID)) as text
+                end tell
+                return "missing"
+                """)
+            XCTAssertEqual(minimized, "true")
+        }
     }
 
     private func openFixtureTab(command: String) throws -> String {
