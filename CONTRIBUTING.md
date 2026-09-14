@@ -2,6 +2,10 @@
 
 Thanks for helping improve Approval Assistant.
 
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). For suspected security
+vulnerabilities, use the private reporting process in [SECURITY.md](SECURITY.md)
+instead of a public issue.
+
 ## Before opening an issue
 
 - Check that Approval Assistant is enabled in **System Settings → Privacy & Security → Automation → Terminal**.
