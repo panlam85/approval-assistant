@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.5 — 2026-09-14
+
+- Continue scanning and locating approval targets past unreadable Terminal windows that return AppleEvent error -10000.
+- Add live coverage for approval in an inactive native Terminal tab while another app retains focus and the selected Terminal tab remains unchanged.
+
 ## 0.1.4 — 2026-09-14
 
 - Send approvals directly to the requesting tab in the background, without bringing Terminal forward or changing its selected tab or minimized state.
