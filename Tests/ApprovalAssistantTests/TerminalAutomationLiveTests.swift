@@ -3,6 +3,31 @@ import XCTest
 
 @MainActor
 final class TerminalAutomationLiveTests: XCTestCase {
+    func testParsesTabsWithAndWithoutWindowIDs() {
+        let separator = "\u{1f}"
+        let records = [
+            ["42", "1", "/dev/ttys001", "true", "prompt"],
+            ["", "2", "/dev/ttys002", "true", "prompt"],
+        ].map { $0.joined(separator: separator) }.joined(separator: "\u{1e}")
+        let snapshots = TerminalAutomation().parseSnapshots(records)
+        XCTAssertEqual(snapshots.count, 2)
+        XCTAssertEqual(snapshots.first?.windowID, 42)
+        XCTAssertNil(snapshots.last?.windowID)
+        XCTAssertEqual(snapshots.last?.tty, "/dev/ttys002")
+    }
+
+    func testAnswersWithMissingWindowIDAndStaleTabPosition() throws {
+        guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_ACTION_TEST"] == "1" else {
+            throw XCTSkip("Set CODEX_APPROVAL_ACTION_TEST=1 to run the controlled Terminal input test.")
+        }
+        try runControlledAction(
+            prompt: threeChoicePrompt,
+            choice: .approveOnce,
+            expectedResponse: "1",
+            discardWindowLocation: true
+        )
+    }
+
     func testScansCodexTerminalTabsWithoutSendingInput() throws {
         guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_LIVE_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_APPROVAL_LIVE_TEST=1 to run the read-only Terminal scan.")
@@ -109,7 +134,8 @@ final class TerminalAutomationLiveTests: XCTestCase {
     private func runControlledAction(
         prompt: String,
         choice: ApprovalChoice,
-        expectedResponse: String
+        expectedResponse: String,
+        discardWindowLocation: Bool = false
     ) throws {
         let fileManager = FileManager.default
         let fixtureDirectory = fileManager.temporaryDirectory
@@ -129,7 +155,13 @@ final class TerminalAutomationLiveTests: XCTestCase {
         defer { try? closeFixtureWindow(tty: fixtureTTY) }
 
         let automation = TerminalAutomation()
-        let snapshot = try waitForFixtureSnapshot(automation: automation, tty: fixtureTTY)
+        var snapshot = try waitForFixtureSnapshot(automation: automation, tty: fixtureTTY)
+        if discardWindowLocation {
+            snapshot = TerminalTabSnapshot(
+                windowID: nil, tabIndex: 999, tty: snapshot.tty,
+                containsCodexProcess: true, contents: snapshot.contents
+            )
+        }
         let matchedPrompt = try XCTUnwrap(PromptMatcher.match(contents: snapshot.contents))
 
         let result = try automation.answer(

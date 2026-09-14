@@ -98,6 +98,7 @@ Approval Assistant uses a deliberately narrow matcher:
 - the prompt must still be at the bottom of the terminal output;
 - the app re-reads the same tab and revalidates the prompt immediately before sending input;
 - each visible prompt is handled once per TTY;
+- windows with missing IDs are scanned by position, and approval targets are resolved afresh by TTY;
 - stale windows or tabs that disappear during a scan are skipped and retried.
 
 Terminal contents are read only for local matching. Only the structured successful-approval fields listed above are stored; full scrollback is not logged or sent over the network.
