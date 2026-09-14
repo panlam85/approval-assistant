@@ -2,7 +2,7 @@
 
 Approval Assistant is a small native macOS menu-bar app that watches Apple Terminal tabs running the Codex CLI and answers recognized approval prompts automatically.
 
-It brings the requesting Terminal tab to the front and sends the selected **yes** response. It does not close Terminal windows or tabs.
+It sends the selected **yes** response directly to the requesting Terminal tab in the background. It does not close Terminal windows or tabs.
 
 ## What it does
 
@@ -10,7 +10,7 @@ It brings the requesting Terminal tab to the front and sends the selected **yes*
 - Can be enabled, paused, or quit from a native menu.
 - Scans every Apple Terminal window and tab whose process list contains `codex`.
 - Recognizes Codex command, file-edit, and permission approval prompts.
-- Selects the requesting tab before responding.
+- Responds without activating Terminal, selecting tabs, or restoring minimized windows.
 - Supports approve-once and approve-and-remember modes.
 - Keeps a bounded, local history of successful approvals.
 - Can start automatically when you log in.
