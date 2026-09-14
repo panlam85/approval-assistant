@@ -139,3 +139,10 @@ The build script creates an ad-hoc signed local app. The repository does not cur
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Please do not include private Terminal output, credentials, or repository contents in bug reports.
+
+Participation follows our [Code of Conduct](CODE_OF_CONDUCT.md). Report suspected
+vulnerabilities privately using the [security policy](SECURITY.md).
+
+## License
+
+Approval Assistant is licensed under the [MIT License](LICENSE).
