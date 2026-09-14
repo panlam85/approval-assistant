@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3 — 2026-09-14
+
+- Continue scanning Terminal windows when a window ID is missing.
+- Locate approval tabs by TTY so approvals do not depend on window IDs or stale window positions.
+- Recheck the target session after bringing its window forward.
+
 ## 0.1.2 — 2026-08-28
 
 - Added support for current Codex command and permission approval prompts.

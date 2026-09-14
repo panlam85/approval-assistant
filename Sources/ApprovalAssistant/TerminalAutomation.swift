@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 struct TerminalTabSnapshot {
-    let windowID: Int
+    let windowID: Int?
     let tabIndex: Int
     let tty: String
     let containsCodexProcess: Bool
@@ -43,12 +43,12 @@ final class TerminalAutomation {
             set maximumContentCharacters to 8000
             set reportText to ""
 
-            set currentWindowIDs to id of every window
-            repeat with currentWindowIDValue in currentWindowIDs
-                set currentWindowID to currentWindowIDValue as integer
-
+            -- Enumerate by position: Terminal can report missing value for a window ID.
+            repeat with windowIndex from 1 to count of windows
                 try
-                    set currentWindow to window id currentWindowID
+                    set currentWindow to window windowIndex
+                    set currentWindowID to id of currentWindow
+                    if currentWindowID is missing value then set currentWindowID to ""
                     set currentTabCount to count of tabs of currentWindow
 
                     repeat with tabIndex from 1 to currentTabCount
@@ -57,7 +57,7 @@ final class TerminalAutomation {
                             set currentTTY to tty of currentTab
                             set currentProcesses to processes of currentTab
                             set hasCodex to currentProcesses contains "codex"
-                            set currentContents to get contents of tab tabIndex of window id currentWindowID
+                            set currentContents to get contents of tab tabIndex of window windowIndex
                             set currentContentLength to length of currentContents
                             if currentContentLength > maximumContentCharacters then
                                 set currentContents to text (currentContentLength - maximumContentCharacters + 1) thru currentContentLength of currentContents
@@ -95,9 +95,7 @@ final class TerminalAutomation {
 
         guard
             let currentSnapshot = try scanTabs().first(where: {
-                $0.windowID == snapshot.windowID
-                    && $0.tabIndex == snapshot.tabIndex
-                    && $0.tty == snapshot.tty
+                $0.tty == snapshot.tty
                     && $0.containsCodexProcess
             }),
             PromptMatcher.match(contents: currentSnapshot.contents) == expectedPrompt
@@ -107,16 +105,31 @@ final class TerminalAutomation {
 
         let script = #"""
         tell application "Terminal"
-            if not (exists window id \#(snapshot.windowID)) then return "window_missing"
-            set targetWindow to window id \#(snapshot.windowID)
-
-            if (count of tabs of targetWindow) < \#(snapshot.tabIndex) then return "tab_missing"
-            set targetTab to tab \#(snapshot.tabIndex) of targetWindow
+            -- Resolve the session afresh by TTY; window/tab positions can change.
+            set targetWindowIndex to 0
+            set targetTabIndex to 0
+            repeat with wi from 1 to count of windows
+                try
+                    repeat with ti from 1 to count of tabs of window wi
+                        if tty of tab ti of window wi is "\#(snapshot.tty)" then
+                            set targetWindowIndex to wi as integer
+                            set targetTabIndex to ti as integer
+                            exit repeat
+                        end if
+                    end repeat
+                on error errorMessage number errorNumber
+                    if errorNumber is not -1728 and errorNumber is not -1719 then error errorMessage number errorNumber
+                end try
+                if targetWindowIndex is not 0 then exit repeat
+            end repeat
+            if targetWindowIndex is 0 then return "tab_missing"
+            set targetWindow to window targetWindowIndex
+            set targetTab to tab targetTabIndex of window targetWindowIndex
 
             if tty of targetTab is not "\#(snapshot.tty)" then return "tab_changed"
             if (processes of targetTab) does not contain "codex" then return "codex_missing"
 
-            set currentContents to get contents of tab \#(snapshot.tabIndex) of targetWindow
+            set currentContents to get contents of tab targetTabIndex of window targetWindowIndex
             set hasLegacyCommandPrompt to currentContents contains "Would you like to proceed?"
             set hasCommandPrompt to currentContents contains "Would you like to run the following command?"
             set hasFileEditPrompt to currentContents contains "Would you like to make the following edits?"
@@ -131,6 +144,10 @@ final class TerminalAutomation {
             set selected tab of targetWindow to targetTab
             set index of targetWindow to 1
             activate
+            -- Bringing the window forward changes positional references.
+            set targetTab to tab targetTabIndex of window 1
+            if tty of targetTab is not "\#(snapshot.tty)" then return "tab_changed"
+            if (processes of targetTab) does not contain "codex" then return "codex_missing"
             do script "\#(responseNumber)" in targetTab
             return "sent"
         end tell
@@ -167,7 +184,7 @@ final class TerminalAutomation {
         return result.stringValue ?? ""
     }
 
-    private func parseSnapshots(_ rawValue: String) -> [TerminalTabSnapshot] {
+    func parseSnapshots(_ rawValue: String) -> [TerminalTabSnapshot] {
         rawValue
             .split(separator: recordSeparator, omittingEmptySubsequences: true)
             .compactMap { rawRecord in
@@ -178,14 +195,13 @@ final class TerminalAutomation {
                 )
                 guard
                     fields.count == 5,
-                    let windowID = Int(fields[0]),
                     let tabIndex = Int(fields[1])
                 else {
                     return nil
                 }
 
                 return TerminalTabSnapshot(
-                    windowID: windowID,
+                    windowID: Int(fields[0]),
                     tabIndex: tabIndex,
                     tty: String(fields[2]),
                     containsCodexProcess: fields[3] == "true",
