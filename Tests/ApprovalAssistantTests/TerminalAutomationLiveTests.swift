@@ -39,6 +39,16 @@ final class TerminalAutomationLiveTests: XCTestCase {
         )
     }
 
+    func testApprovesUnselectedTab() throws {
+        guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_ACTION_TEST"] == "1" else {
+            throw XCTSkip("Set CODEX_APPROVAL_ACTION_TEST=1 to run the controlled Terminal input test.")
+        }
+        try runControlledAction(
+            prompt: threeChoicePrompt, choice: .approveOnce,
+            expectedResponse: "1", unselected: true
+        )
+    }
+
     func testScansCodexTerminalTabsWithoutSendingInput() throws {
         guard ProcessInfo.processInfo.environment["CODEX_APPROVAL_LIVE_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_APPROVAL_LIVE_TEST=1 to run the read-only Terminal scan.")
@@ -147,7 +157,8 @@ final class TerminalAutomationLiveTests: XCTestCase {
         choice: ApprovalChoice,
         expectedResponse: String,
         discardWindowLocation: Bool = false,
-        background: Bool = false
+        background: Bool = false,
+        unselected: Bool = false
     ) throws {
         let fileManager = FileManager.default
         let fixtureDirectory = fileManager.temporaryDirectory
@@ -174,11 +185,11 @@ final class TerminalAutomationLiveTests: XCTestCase {
                 containsCodexProcess: true, contents: snapshot.contents
             )
         }
-        let matchedPrompt = try XCTUnwrap(PromptMatcher.match(contents: snapshot.contents))
+        var matchedPrompt = try XCTUnwrap(PromptMatcher.match(contents: snapshot.contents))
 
         let previousApp = NSWorkspace.shared.frontmostApplication
         defer {
-            if background { previousApp?.activate() }
+            if background || unselected { previousApp?.activate() }
         }
         if background {
             _ = try executeAppleScript("""
@@ -190,6 +201,29 @@ final class TerminalAutomationLiveTests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.3)
             XCTAssertEqual(NSWorkspace.shared.frontmostApplication?.bundleIdentifier, "com.apple.finder")
         }
+        var selectedTTY: String?
+        if unselected {
+            let windowID = try XCTUnwrap(snapshot.windowID)
+            _ = try executeAppleScript("""
+                tell application "Terminal"
+                    set index of window id \(windowID) to 1
+                    activate
+                    if id of front window is not \(windowID) then error "Fixture is not frontmost"
+                end tell
+                tell application "System Events" to keystroke "t" using command down
+                """)
+            Thread.sleep(forTimeInterval: 0.5)
+            selectedTTY = try executeAppleScript("tell application \"Terminal\" to get tty of selected tab of front window")
+            try XCTSkipIf(selectedTTY == fixtureTTY, "Terminal did not create a separate fixture tab.")
+            _ = try executeAppleScript("tell application \"Finder\" to activate")
+            Thread.sleep(forTimeInterval: 0.3)
+            XCTAssertEqual(NSWorkspace.shared.frontmostApplication?.bundleIdentifier, "com.apple.finder")
+            snapshot = try waitForFixtureSnapshot(automation: automation, tty: fixtureTTY)
+            matchedPrompt = try XCTUnwrap(PromptMatcher.match(contents: snapshot.contents))
+        }
+        defer {
+            if let selectedTTY, selectedTTY != fixtureTTY { try? closeFixtureWindow(tty: selectedTTY) }
+        }
         let foregroundPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
 
         let result = try automation.answer(
@@ -200,8 +234,14 @@ final class TerminalAutomationLiveTests: XCTestCase {
 
         XCTAssertEqual(result, .sent)
         XCTAssertTrue(try waitForResponse(at: responseFile).hasPrefix(expectedResponse))
-        if background {
+        if let selectedTTY {
+            let after = try executeAppleScript("tell application \"Terminal\" to get tty of selected tab of front window")
+            XCTAssertEqual(after, selectedTTY)
+        }
+        if background || unselected {
             XCTAssertEqual(NSWorkspace.shared.frontmostApplication?.processIdentifier, foregroundPID)
+        }
+        if background {
             let minimized = try executeAppleScript("""
                 tell application "Terminal"
                     return miniaturized of window id \(try XCTUnwrap(snapshot.windowID)) as text
@@ -267,13 +307,18 @@ final class TerminalAutomationLiveTests: XCTestCase {
     private func closeFixtureWindow(tty: String) throws {
         let script = #"""
         tell application "Terminal"
-            repeat with currentWindow in windows
+            repeat with wi from 1 to count of windows
+                try
+                set currentWindow to window wi
                 repeat with currentTab in tabs of currentWindow
                     if tty of currentTab is "\#(escapeForAppleScript(tty))" then
                         close currentWindow
                         return "closed"
                     end if
                 end repeat
+                on error errorMessage number errorNumber
+                    if errorNumber is not -1728 and errorNumber is not -1719 and errorNumber is not -10000 then error errorMessage number errorNumber
+                end try
             end repeat
             return "missing"
         end tell

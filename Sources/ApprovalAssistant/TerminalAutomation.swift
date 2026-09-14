@@ -44,6 +44,7 @@ final class TerminalAutomation {
             set reportText to ""
 
             -- Enumerate by position: Terminal can report missing value for a window ID.
+            -- Unreadable auxiliary windows (-10000) must not block later tabs.
             repeat with windowIndex from 1 to count of windows
                 try
                     set currentWindow to window windowIndex
@@ -65,11 +66,11 @@ final class TerminalAutomation {
 
                             set reportText to reportText & currentWindowID & fieldSeparator & tabIndex & fieldSeparator & currentTTY & fieldSeparator & hasCodex & fieldSeparator & currentContents & recordSeparator
                         on error errorMessage number errorNumber
-                            if errorNumber is not -1728 and errorNumber is not -1719 then error errorMessage number errorNumber
+                            if errorNumber is not -1728 and errorNumber is not -1719 and errorNumber is not -10000 then error errorMessage number errorNumber
                         end try
                     end repeat
                 on error errorMessage number errorNumber
-                    if errorNumber is not -1728 and errorNumber is not -1719 then error errorMessage number errorNumber
+                    if errorNumber is not -1728 and errorNumber is not -1719 and errorNumber is not -10000 then error errorMessage number errorNumber
                 end try
             end repeat
 
@@ -118,7 +119,7 @@ final class TerminalAutomation {
                         end if
                     end repeat
                 on error errorMessage number errorNumber
-                    if errorNumber is not -1728 and errorNumber is not -1719 then error errorMessage number errorNumber
+                    if errorNumber is not -1728 and errorNumber is not -1719 and errorNumber is not -10000 then error errorMessage number errorNumber
                 end try
                 if targetWindowIndex is not 0 then exit repeat
             end repeat
